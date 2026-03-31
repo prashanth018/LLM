@@ -1,4 +1,5 @@
 from torch.utils.data import Dataset
+from torch import tensor
 from nltk.corpus import gutenberg
 import tiktoken
 
@@ -21,7 +22,7 @@ class GutenbergDataset(Dataset):
         return (input, target)
 
     def __getitem__(self, key):
-        return (self.input[key], self.target[key])
+        return (tensor(self.input[key]), tensor(self.target[key]))
 
     def __len__(self):
         return len(self.input)

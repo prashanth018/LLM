@@ -1,33 +1,15 @@
 import tiktoken
-import torch.nn as nn
-from torch.nn import Embedding, Module
 from torch.utils.data import DataLoader
 
 
 from dataset import GutenbergDataset
+from nnets import PositionalEmbedding, TokenEmbedding
+from torch import tensor
 
 CONTEXT_LENGTH = 4
 STRIDE = 4
-VECTOR_DIM = 256
-BATCH_SIZE = 32
-
-
-class TokenEmbedding(nn.Module):
-    def __init__(self, vocab_size, vector_dim):
-        super().__init__()
-        self.embedding = Embedding(vocab_size, vector_dim)
-
-    def forward(self, batch):
-        return self.embedding(batch)
-
-
-class PositionEmbedding(nn.Module):
-    def __init__(self, context_length, vector_dim):
-        super().__init__()
-        self.embedding = Embedding(context_length, vector_dim)
-
-    def forward(self, batch):
-        return self.embedding(batch)
+VECTOR_DIM = 3
+BATCH_SIZE = 8
 
 
 if __name__ == "__main__":
@@ -37,5 +19,27 @@ if __name__ == "__main__":
     )
     dataloader = DataLoader(dataset=dataset, batch_size=BATCH_SIZE, shuffle=True)
     inputs, targets = next(iter(dataloader))
-    print("Inputs = ", inputs)
-    print("Target = ", targets)
+    # print("Inputs = ", inputs)
+    # print("Target = ", targets)
+    print(inputs.shape)
+    vocab_size = tokenizer.n_vocab
+    token_embedding = TokenEmbedding(vocab_size, VECTOR_DIM)
+    positional_embedding = PositionalEmbedding(CONTEXT_LENGTH, VECTOR_DIM)
+
+    # temp = tensor([[1], [2]])
+    # temp = tensor([[1, 2]])
+    # temp = tensor([1, 2])
+    # temp = tensor([[1, 2, 3, 4], [4, 5, 6, 4]])
+    # print(temp.shape)
+    # print(token_embedding(temp).shape)
+
+    input_batch_token_embedding = token_embedding(inputs)
+    # print(input_batch_token_embedding)
+    print(
+        "Shape of Token Embedding for the current batch = ",
+        input_batch_token_embedding.shape,
+    )
+    input_batch_positional_embedding = positional_embedding()
+    print("Shape of Positional Embedding = ", input_batch_positional_embedding.shape)
+    input_embeddings = input_batch_token_embedding + input_batch_positional_embedding
+    print("Shape of Input Embedding for the current batch = ", input_embeddings.shape)
