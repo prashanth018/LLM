@@ -1,6 +1,6 @@
 import torch.nn as nn
 from torch.nn import Embedding, Module
-import torch
+from torch import arange
 
 
 class TokenEmbedding(nn.Module):
@@ -18,5 +18,5 @@ class PositionalEmbedding(nn.Module):
         self.embedding = Embedding(context_length, vector_dim)
 
     def forward(self):
-        positions = torch.arange(self.embedding.num_embeddings)
+        positions = arange(self.embedding.num_embeddings)
         return self.embedding(positions)

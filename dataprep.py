@@ -4,12 +4,16 @@ from torch.utils.data import DataLoader
 
 from dataset import GutenbergDataset
 from nnets import PositionalEmbedding, TokenEmbedding
+from attention import MultiHeadAttention
 from torch import tensor
 
 CONTEXT_LENGTH = 4
 STRIDE = 4
-VECTOR_DIM = 3
 BATCH_SIZE = 8
+NUM_HEADS = 6
+VECTOR_DIM = 3
+MHA_DIM_IN = VECTOR_DIM
+MHA_DIM_OUT = 2
 
 
 if __name__ == "__main__":
@@ -21,7 +25,7 @@ if __name__ == "__main__":
     inputs, targets = next(iter(dataloader))
     # print("Inputs = ", inputs)
     # print("Target = ", targets)
-    print(inputs.shape)
+    print(inputs.shape)  # should be (8,4)
     vocab_size = tokenizer.n_vocab
     token_embedding = TokenEmbedding(vocab_size, VECTOR_DIM)
     positional_embedding = PositionalEmbedding(CONTEXT_LENGTH, VECTOR_DIM)
@@ -38,8 +42,22 @@ if __name__ == "__main__":
     print(
         "Shape of Token Embedding for the current batch = ",
         input_batch_token_embedding.shape,
-    )
+    )  # should be (8,4,3)
     input_batch_positional_embedding = positional_embedding()
-    print("Shape of Positional Embedding = ", input_batch_positional_embedding.shape)
+    print(
+        "Shape of Positional Embedding = ", input_batch_positional_embedding.shape
+    )  # should be (4,3)
     input_embeddings = input_batch_token_embedding + input_batch_positional_embedding
-    print("Shape of Input Embedding for the current batch = ", input_embeddings.shape)
+    print(
+        "Shape of Input Embedding for the current batch = ", input_embeddings.shape
+    )  # should be (8,4,3)
+    multi_head_attention = MultiHeadAttention(
+        num_heads=NUM_HEADS,
+        context_length=CONTEXT_LENGTH,
+        dim_in=MHA_DIM_IN,
+        dim_out=MHA_DIM_OUT,
+    )
+    mha_out = multi_head_attention(input_embeddings)
+    print(
+        "Shape of MHA Out = ", mha_out.shape
+    )  # should be (8,4,12) [BATCH_SIZE, CONTEXT_LENGTH, NUM_HEADS*MHA_DIM_OUT]

@@ -6,9 +6,9 @@ import tiktoken
 
 class GutenbergDataset(Dataset):
     def __init__(self, tokenizer, context_length, stride):
+        self.tokenizer = tokenizer
         self.context_length = context_length
         self.stride = stride
-        self.tokenizer = tokenizer
         corpus = gutenberg.raw("shakespeare-caesar.txt")
         self.tokens = self.tokenizer.encode(corpus)
         self.input, self.target = self.create_data()
@@ -40,6 +40,7 @@ if __name__ == "__main__":
 
     # for i in range(len(target)):
     #     print(input[i], target[i])
-    dataset = GutenbergDataset(context_length=4, stride=4)
+    tokenizer = tiktoken.get_encoding("gpt2")
+    dataset = GutenbergDataset(tokenizer=tokenizer, context_length=4, stride=4)
     print(dataset.__getitem__(4))
     print(dataset.__getitem__(5))
