@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 
 from dataset import GutenbergDataset
 from nnets import PositionalEmbedding, TokenEmbedding
-from attention import MultiHeadAttention
+from attention import MultiHeadAttention, MultiHeadAttentionEfficient
 from torch import tensor
 
 CONTEXT_LENGTH = 4
@@ -13,7 +13,8 @@ BATCH_SIZE = 8
 NUM_HEADS = 6
 VECTOR_DIM = 3
 MHA_DIM_IN = VECTOR_DIM
-MHA_DIM_OUT = 2
+MHA_DIM_OUT = 12
+DROPOUT = 0.1
 
 
 if __name__ == "__main__":
@@ -51,13 +52,25 @@ if __name__ == "__main__":
     print(
         "Shape of Input Embedding for the current batch = ", input_embeddings.shape
     )  # should be (8,4,3)
-    multi_head_attention = MultiHeadAttention(
-        num_heads=NUM_HEADS,
+    # multi_head_attention = MultiHeadAttention(
+    #     num_heads=NUM_HEADS,
+    #     context_length=CONTEXT_LENGTH,
+    #     dim_in=MHA_DIM_IN,
+    #     dim_out=MHA_DIM_OUT,
+    # )
+    # mha_out = multi_head_attention(input_embeddings)
+    # print(
+    #     "Shape of MHA Out = ", mha_out.shape
+    # )  # should be (8,4,12) [BATCH_SIZE, CONTEXT_LENGTH, NUM_HEADS*MHA_DIM_OUT]
+
+    multi_head_attention_efficient = MultiHeadAttentionEfficient(
         context_length=CONTEXT_LENGTH,
         dim_in=MHA_DIM_IN,
         dim_out=MHA_DIM_OUT,
+        num_heads=NUM_HEADS,
+        dropout=DROPOUT,
     )
-    mha_out = multi_head_attention(input_embeddings)
+    mha_efficient_out = multi_head_attention_efficient(input_embeddings)
     print(
-        "Shape of MHA Out = ", mha_out.shape
+        "Shape of MHA Shared Weights Out = ", mha_efficient_out.shape
     )  # should be (8,4,12) [BATCH_SIZE, CONTEXT_LENGTH, NUM_HEADS*MHA_DIM_OUT]
