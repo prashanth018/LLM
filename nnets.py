@@ -17,6 +17,7 @@ class PositionalEmbedding(nn.Module):
         super().__init__()
         self.embedding = Embedding(context_length, vector_dim)
 
-    def forward(self):
-        positions = arange(self.embedding.num_embeddings)
+    def forward(self, range):
+        # positions = arange(self.embedding.num_embeddings)
+        positions = range
         return self.embedding(positions)

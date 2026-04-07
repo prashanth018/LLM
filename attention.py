@@ -59,6 +59,10 @@ class CausalAttention(Module):
 class MultiHeadAttention(Module):
     def __init__(self, num_heads, context_length, dim_in, dim_out):
         super().__init__()
+        if dim_out % num_heads != 0:
+            raise ValueError(
+                f"dim_out ({dim_out}) must be divisible by num_heads ({num_heads})"
+            )
         self.num_heads = num_heads
         self.attention_heads = ModuleList([])
         for i in range(num_heads):
@@ -118,7 +122,9 @@ class MultiHeadAttentionEfficient(Module):
 
         # attention_scores = (b, num_heads, context_length, context_length)
         attention_scores = Q_rearranged @ K_rearraged
-        attention_scores = attention_scores.masked_fill(self.bool_mask, -float("inf"))
+        attention_scores = attention_scores.masked_fill(
+            self.bool_mask[:context_length, :context_length], -float("inf")
+        )
         attention_scores = attention_scores / head_dim**0.5
         # attention_weights = (b, num_heads, context_length, context_length)
         attention_weights = F.softmax(attention_scores, dim=-1)

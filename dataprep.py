@@ -6,6 +6,7 @@ from dataset import GutenbergDataset
 from nnets import PositionalEmbedding, TokenEmbedding
 from attention import MultiHeadAttention, MultiHeadAttentionEfficient
 from torch import tensor
+from torch import arange
 
 CONTEXT_LENGTH = 4
 STRIDE = 4
@@ -44,7 +45,7 @@ if __name__ == "__main__":
         "Shape of Token Embedding for the current batch = ",
         input_batch_token_embedding.shape,
     )  # should be (8,4,3)
-    input_batch_positional_embedding = positional_embedding()
+    input_batch_positional_embedding = positional_embedding(arange(CONTEXT_LENGTH))
     print(
         "Shape of Positional Embedding = ", input_batch_positional_embedding.shape
     )  # should be (4,3)
