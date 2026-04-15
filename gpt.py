@@ -2,7 +2,7 @@ from torch.nn import Dropout, Linear, Module, Sequential
 import tiktoken
 from torch.utils.data import DataLoader
 
-from dataset import GutenbergDataset
+from dataset.gutenberg_dataset import GutenbergDataset
 from nnets import PositionalEmbedding, TokenEmbedding
 from transformer import LayerNorm, Transformer
 

@@ -2,7 +2,7 @@ import tiktoken
 from torch.utils.data import DataLoader
 
 
-from dataset import GutenbergDataset
+from dataset.gutenberg_dataset import GutenbergDataset
 from nnets import PositionalEmbedding, TokenEmbedding
 from attention import MultiHeadAttention, MultiHeadAttentionEfficient
 from torch import tensor
