@@ -192,12 +192,13 @@ def train():
         )
         print(f"Epoch num {epoch}, loss: {validation_loss_per_epoch[-1]}")
     plot_loss(validation_loss_per_epoch)
-    save_model(model=model)
+    save_model(model=model, optim=optim)
     trained_model_inference(model)
 
 
-def save_model(model):
+def save_model(model, optim):
     os.makedirs("./weights", exist_ok=True)
+    os.makedirs("./optim", exist_ok=True)
     existing = glob.glob("./weights/*.pth")
     next_id = (
         max(
@@ -207,14 +208,25 @@ def save_model(model):
         + 1
     )
     torch.save(model.state_dict(), f"./weights/{next_id:03d}.pth")
+    torch.save(optim.state_dict(), f"./optim/{next_id:03d}.pth")
 
 
-def load_model(model):
-    existing = glob.glob("./weights/*.pth")
-    if not existing:
+def load_model(model, optim=None):
+    existing_weights = glob.glob("./weights/*.pth")
+    if not existing_weights:
         raise FileNotFoundError("No weights found in ./weights/")
-    latest = max(existing, key=lambda f: int(os.path.splitext(os.path.basename(f))[0]))
-    model.load_state_dict(torch.load(latest))
+    latest_weights = max(
+        existing_weights, key=lambda f: int(os.path.splitext(os.path.basename(f))[0])
+    )
+    model.load_state_dict(torch.load(latest_weights, weights_only=True))
+    if optim is not None:
+        existing_optim = glob.glob("./optim/*.pth")
+        if not existing_optim:
+            raise FileNotFoundError("No weights found in ./optim/")
+        latest_optim = max(
+            existing_optim, key=lambda f: int(os.path.splitext(os.path.basename(f))[0])
+        )
+        optim.load_state_dict(torch.load(latest_optim, weights_only=True))
 
 
 def plot_loss(losses):
