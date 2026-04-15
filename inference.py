@@ -14,6 +14,7 @@ import torch
 from torch.utils.data import DataLoader, random_split
 from torch.optim import AdamW
 import torch.nn as nn
+import torch.nn.functional as F
 
 from constants import CONFIG_EXP_M, NUM_EPOCHS
 from dataset import GutenbergDataset
@@ -59,6 +60,41 @@ def trained_model_inference(model=None, init_context="I love", max_tokens=10):
             last_token = prediction[0, -1, :].argmax().item()
             input_str = input_str + tokenizer.decode([last_token])
             print(input_str)
+
+
+def inference_with_temperature_and_topk(
+    model=None, init_context="I love", max_tokens=10, temperature=0.7, topk=3
+):
+    tokenizer = tiktoken.get_encoding("gpt2")
+    CONFIG_EXP_M["vocab_size"] = tokenizer.n_vocab
+    if model == None:
+        model = GPT(CONFIG_EXP_M)
+    model.eval()
+    input_str = init_context
+    with torch.no_grad():
+        input_vec = tensor(
+            tokenizer.encode(input_str)[-CONFIG_EXP_M["context_length"] :]
+        )
+        for _ in range(max_tokens):
+            # print("Input size", input_vec.shape)
+            input_vec = input_vec.reshape(1, len(input_vec))
+            logits = model(input_vec)[0, -1, :]
+            # apply temperature
+            logits = logits / temperature
+            # apply topk
+            n_vocab = logits.shape[-1]
+            topk_indices = torch.topk(logits, topk).indices
+            mask = torch.ones(n_vocab, dtype=bool)
+            mask[topk_indices] = 0
+            logits = logits.masked_fill(mask, -float("inf"))
+            # apply softmax & multinomial
+            index = torch.multinomial(F.softmax(logits, dim=-1), num_samples=1)
+            # append to input tokens
+            input_vec = torch.cat([input_vec, index.reshape(1, 1)], dim=1).squeeze()
+            # print tokens
+            # print(input_vec)
+            # print(input_vec.shape)
+            print(tokenizer.decode(input_vec.tolist()))
 
 
 def calculate_loss_for_single_batch():
@@ -207,5 +243,6 @@ if __name__ == "__main__":
     # print(tokenizer.decode(5044))
     # inference()
     # calculate_loss_for_single_batch()
-    train()
+    # train()
     # trained_model_inference()
+    inference_with_temperature_and_topk()
