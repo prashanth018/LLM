@@ -14,13 +14,17 @@ from constants import CONFIG_EXP_S
 class GPT(Module):
     def __init__(self, config):
         super().__init__()
+        # print("  GPT: token embedding")
         self.token_embedding = TokenEmbedding(
             vocab_size=config["vocab_size"], vector_dim=config["dim"]
         )
+        # print("  GPT: positional embedding")
         self.positional_embedding = PositionalEmbedding(
             context_length=config["context_length"], vector_dim=config["dim"]
         )
+        # print("  GPT: dropout")
         self.dropout = Dropout(config["dropout"])
+        # print("  GPT: transformers")
         self.transformers = Sequential(
             *[
                 Transformer(
@@ -32,8 +36,10 @@ class GPT(Module):
                 for _ in range(config["n_layers"])
             ]
         )
+        # print("  GPT: final norm + out head")
         self.final_norm = LayerNorm(dim=config["dim"])
         self.out_head = Linear(config["dim"], config["vocab_size"], bias=False)
+        # print("  GPT: done")
 
     def forward(self, x):
         b, context_len = x.shape

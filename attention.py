@@ -92,6 +92,7 @@ class MultiHeadAttentionEfficient(Module):
             ones(context_length, context_length, dtype=bool), diagonal=1
         )
         self.dropout = Dropout(dropout)
+        self.W_O = Linear(dim_out, dim_out)
 
     def forward(self, batch):
         # batch = (b, context_length, dim_in)
@@ -142,7 +143,10 @@ class MultiHeadAttentionEfficient(Module):
         # context_vector = (b, context_length, num_heads, head_dim)
         context_vector = context_vector.transpose(-2, -3)
         # context_vector = (b, context_length, num_heads * head_dim)
-        return context_vector.reshape(batch_size, context_length, self.dim_out)
+        context_vector = context_vector.reshape(
+            batch_size, context_length, self.dim_out
+        )
+        return self.W_O(context_vector)
 
 
 # Note:
