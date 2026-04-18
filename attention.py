@@ -82,7 +82,8 @@ class MultiHeadAttention(Module):
 class MultiHeadAttentionEfficient(Module):
     def __init__(self, context_length, dim_in, dim_out, num_heads, dropout):
         super().__init__()
-        qkv_bias = False
+        qkv_bias = True
+        output_bias = True
         self.num_heads = num_heads
         self.dim_out = dim_out
         self.W_Q = Linear(dim_in, dim_out, bias=qkv_bias)
@@ -92,7 +93,7 @@ class MultiHeadAttentionEfficient(Module):
             ones(context_length, context_length, dtype=bool), diagonal=1
         )
         self.dropout = Dropout(dropout)
-        self.W_O = Linear(dim_out, dim_out)
+        self.W_O = Linear(dim_out, dim_out, bias=output_bias)
 
     def forward(self, batch):
         # batch = (b, context_length, dim_in)

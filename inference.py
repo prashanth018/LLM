@@ -1,5 +1,7 @@
 import os
 
+from load_gpt2 import load_and_map_gpt2
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -16,7 +18,7 @@ from torch.optim import AdamW
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.constants import CONFIG_EXP_M, NUM_EPOCHS
+from utils.constants import CONFIG_EXP_M, CONFIG_GPT2_124M, NUM_EPOCHS
 from dataset.gutenberg_dataset import GutenbergDataset
 from gpt import GPT
 
@@ -54,6 +56,22 @@ def trained_model_inference(model=None, init_context="I love", max_tokens=10):
         for _ in range(max_tokens):
             input = tensor(tokenizer.encode(input_str))[
                 -CONFIG_EXP_M["context_length"] :
+            ]
+            input = input.unsqueeze(dim=0)
+            prediction = model(input)
+            last_token = prediction[0, -1, :].argmax().item()
+            input_str = input_str + tokenizer.decode([last_token])
+            print(input_str)
+
+
+def gpt2_inference(model=None, init_context="I love", max_tokens=10):
+    tokenizer = tiktoken.get_encoding("gpt2")
+    model.eval()
+    input_str = init_context
+    with torch.no_grad():
+        for _ in range(max_tokens):
+            input = tensor(tokenizer.encode(input_str))[
+                -CONFIG_GPT2_124M["context_length"] :
             ]
             input = input.unsqueeze(dim=0)
             prediction = model(input)
@@ -257,4 +275,6 @@ if __name__ == "__main__":
     # calculate_loss_for_single_batch()
     # train()
     # trained_model_inference()
-    inference_with_temperature_and_topk()
+    # inference_with_temperature_and_topk()
+    model = load_and_map_gpt2(CONFIG_GPT2_124M)
+    gpt2_inference(model)

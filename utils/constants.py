@@ -33,3 +33,13 @@ CONFIG_EXP_M = {
     "n_layers": NUM_LAYERS,
     "dropout": DROPOUT,
 }
+
+CONFIG_GPT2_124M = {
+    "context_length": 1024,
+    "stride": 1024,
+    "batch_size": 8,
+    "dim": 768,
+    "n_heads": 12,
+    "n_layers": 12,
+    "dropout": DROPOUT,
+}
