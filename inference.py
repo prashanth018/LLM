@@ -16,7 +16,7 @@ from torch.optim import AdamW
 import torch.nn as nn
 import torch.nn.functional as F
 
-from constants import CONFIG_EXP_M, NUM_EPOCHS
+from utils.constants import CONFIG_EXP_M, NUM_EPOCHS
 from dataset.gutenberg_dataset import GutenbergDataset
 from gpt import GPT
 

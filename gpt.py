@@ -8,7 +8,7 @@ from transformer import LayerNorm, Transformer
 
 from torch import arange
 
-from constants import CONFIG_EXP_S
+from utils.constants import CONFIG_EXP_S
 
 
 class GPT(Module):
