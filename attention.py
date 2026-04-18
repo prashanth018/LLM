@@ -96,6 +96,7 @@ class MultiHeadAttentionEfficient(Module):
         self.W_O = Linear(dim_out, dim_out, bias=output_bias)
 
     def forward(self, batch):
+        self.bool_mask = self.bool_mask.to(batch.device)
         # batch = (b, context_length, dim_in)
         # W_Q = (dim_in, dim_out)
         # Q = (b, context_length, dim_out)

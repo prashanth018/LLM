@@ -90,7 +90,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(
         dataset=dataset,
         collate_fn=partial(
-            collate_fn, pad_token_id=50256, ignore_index=-100, device="cpu"
+            collate_fn, pad_token_id=50256, ignore_index=-100, device="mps"
         ),
         batch_size=8,
         shuffle=True,

@@ -59,7 +59,7 @@ def load_and_map_gpt2(config):
             )
             model.transformers[i].ffn.ffn[2].bias.copy_(t(block["mlp"]["c_proj"]["b"]))
 
-        # final norm
+        # final
         model.final_norm.scale.copy_(t(params["g"]))
         model.final_norm.shift.copy_(t(params["b"]))
 

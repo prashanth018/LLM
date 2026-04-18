@@ -1,5 +1,7 @@
+from functools import partial
 import os
 
+from dataset.instructionft_dataset import InstructionFineTuningDataset, collate_fn
 from load_gpt2 import load_and_map_gpt2
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -11,7 +13,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import tiktoken
-from torch import tensor
+from torch import multinomial, ones, tensor, topk
 import torch
 from torch.utils.data import DataLoader, random_split
 from torch.optim import AdamW
@@ -80,8 +82,38 @@ def gpt2_inference(model=None, init_context="I love", max_tokens=10):
             print(input_str)
 
 
+def gpt2_inference_with_temperature_and_topk(
+    model=None, init_context="I love", max_tokens=20, temperature=0.7, top_k=3
+):
+    tokenizer = tiktoken.get_encoding("gpt2")
+    model.eval()
+    input_str = init_context
+    with torch.no_grad():
+        for _ in range(max_tokens):
+            input = tensor(tokenizer.encode(input_str))[
+                -CONFIG_GPT2_124M["context_length"] :
+            ]
+            input = input.unsqueeze(dim=0)
+            prediction = model(input)
+            last_token_logit = prediction[0, -1, :]
+            vocab_size = last_token_logit.shape[-1]
+            # apply temperature
+            last_token_logit = last_token_logit / temperature
+            # topk
+            topk_indices = topk(last_token_logit, top_k).indices
+            mask = ones(vocab_size, dtype=bool)
+            mask[topk_indices] = 0
+            last_token_logit = last_token_logit.masked_fill(mask, -float("inf"))
+            # softmax and sample
+            next_token = multinomial(
+                F.softmax(last_token_logit, dim=-1), num_samples=1
+            ).item()
+            input_str = input_str + tokenizer.decode([next_token])
+            print(input_str)
+
+
 def inference_with_temperature_and_topk(
-    model=None, init_context="I love", max_tokens=10, temperature=0.7, topk=3
+    model=None, init_context="I love", max_tokens=10, temperature=0.7, top_k=3
 ):
     tokenizer = tiktoken.get_encoding("gpt2")
     CONFIG_EXP_M["vocab_size"] = tokenizer.n_vocab
@@ -101,7 +133,7 @@ def inference_with_temperature_and_topk(
             logits = logits / temperature
             # apply topk
             n_vocab = logits.shape[-1]
-            topk_indices = torch.topk(logits, topk).indices
+            topk_indices = torch.topk(logits, top_k).indices
             mask = torch.ones(n_vocab, dtype=bool)
             mask[topk_indices] = 0
             logits = logits.masked_fill(mask, -float("inf"))
@@ -113,6 +145,41 @@ def inference_with_temperature_and_topk(
             # print(input_vec)
             # print(input_vec.shape)
             print(tokenizer.decode(input_vec.tolist()))
+
+
+def calculate_gpt2_loss_for_single_batch(
+    model: GPT, pad_token_id=50256, ignore_index=-100, device="mps", batch_size=8
+):
+    tokenizer = tiktoken.get_encoding("gpt2")
+    dataset = InstructionFineTuningDataset(tokenizer=tokenizer)
+    dataloader = DataLoader(
+        dataset=dataset,
+        collate_fn=partial(
+            collate_fn,
+            pad_token_id=pad_token_id,
+            ignore_index=ignore_index,
+            device=device,
+        ),
+        batch_size=batch_size,
+        shuffle=True,
+    )
+    model.eval()
+    cross_entropy_loss_fn = nn.CrossEntropyLoss(ignore_index=ignore_index)
+    with torch.no_grad():
+        for input, target in dataloader:
+            print("Shape of the Input: ", input.shape)
+            # print(input)
+            prediction = model(input)
+            # print("Shape of the Prediction: ", prediction.shape)
+            # flatten batch and token column; resulting shape = (b * context_size, vocab_size)
+            prediction = prediction.flatten(0, 1)
+            # flatten batch and token column; resulting shape = (b * context_size,)
+            target = target.flatten()
+            print("Shape of the Prediction: ", prediction.shape)
+            print("Shape of the Target: ", target.shape)
+            loss = cross_entropy_loss_fn(prediction, target)
+            print(loss.item())
+            break
 
 
 def calculate_loss_for_single_batch():
@@ -277,4 +344,8 @@ if __name__ == "__main__":
     # trained_model_inference()
     # inference_with_temperature_and_topk()
     model = load_and_map_gpt2(CONFIG_GPT2_124M)
-    gpt2_inference(model)
+    device = "mps"
+    model.to(device)
+    # gpt2_inference(model)
+    # gpt2_inference_with_temperature_and_topk(model=model)
+    calculate_gpt2_loss_for_single_batch(model=model, device=device)
