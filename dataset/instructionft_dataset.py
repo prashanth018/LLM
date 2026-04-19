@@ -59,7 +59,7 @@ def collate_fn(batch, pad_token_id=50256, ignore_index=-100, device="cpu"):
     input_list = pad_sequence(input_list, padding_value=pad_token_id, batch_first=True)
     # pad_sequence(target_list, padding_value=pad_token_id, batch_first=True)
     max_len = max([len(w) for w in target_list])
-    print("max_len: ", max_len)
+    # print("max_len: ", max_len)
 
     new_target_list = []
     for target in target_list:

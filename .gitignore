@@ -4,3 +4,4 @@ __pycache__/
 weights/
 plots/
 model_weights/
+optim/

@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader, random_split
 from torch.optim import AdamW
 import torch.nn as nn
 import torch.nn.functional as F
+import time
 
 from utils.constants import CONFIG_EXP_M, CONFIG_GPT2_124M, NUM_EPOCHS
 from dataset.gutenberg_dataset import GutenbergDataset
@@ -66,34 +67,49 @@ def trained_model_inference(model=None, init_context="I love", max_tokens=10):
             print(input_str)
 
 
-def gpt2_inference(model=None, init_context="I love", max_tokens=10):
+def gpt2_inference(model=None, init_context="I love", max_tokens=10, device="mps"):
     tokenizer = tiktoken.get_encoding("gpt2")
+    stop_token_id = tokenizer.encode(
+        "<|endoftext|>", allowed_special={"<|endoftext|>"}
+    )[0]
+    model.to(device)
     model.eval()
     input_str = init_context
     with torch.no_grad():
         for _ in range(max_tokens):
-            input = tensor(tokenizer.encode(input_str))[
-                -CONFIG_GPT2_124M["context_length"] :
-            ]
-            input = input.unsqueeze(dim=0)
+            input = tensor(
+                tokenizer.encode(input_str, allowed_special={"<|endoftext|>"})
+            )[-CONFIG_GPT2_124M["context_length"] :]
+            input = input.unsqueeze(dim=0).to(device)
             prediction = model(input)
             last_token = prediction[0, -1, :].argmax().item()
+            if last_token == stop_token_id:
+                break
             input_str = input_str + tokenizer.decode([last_token])
-            print(input_str)
+        print(input_str)
 
 
 def gpt2_inference_with_temperature_and_topk(
-    model=None, init_context="I love", max_tokens=20, temperature=0.7, top_k=3
+    model=None,
+    init_context="I love",
+    max_tokens=20,
+    temperature=0.7,
+    top_k=3,
+    device="mps",
 ):
     tokenizer = tiktoken.get_encoding("gpt2")
+    stop_token_id = tokenizer.encode(
+        "<|endoftext|>", allowed_special={"<|endoftext|>"}
+    )[0]
+    model.to(device)
     model.eval()
-    input_str = init_context
+
+    # input_str = init_context
+    input_ids = tokenizer.encode(init_context, allowed_special={"<|endoftext|>"})
+    input_tensor = tensor(input_ids).unsqueeze(0).to(device)
     with torch.no_grad():
         for _ in range(max_tokens):
-            input = tensor(tokenizer.encode(input_str))[
-                -CONFIG_GPT2_124M["context_length"] :
-            ]
-            input = input.unsqueeze(dim=0)
+            input = input_tensor[:, -CONFIG_GPT2_124M["context_length"] :]
             prediction = model(input)
             last_token_logit = prediction[0, -1, :]
             vocab_size = last_token_logit.shape[-1]
@@ -101,15 +117,22 @@ def gpt2_inference_with_temperature_and_topk(
             last_token_logit = last_token_logit / temperature
             # topk
             topk_indices = topk(last_token_logit, top_k).indices
-            mask = ones(vocab_size, dtype=bool)
+            mask = ones(vocab_size, dtype=bool).to(device)
             mask[topk_indices] = 0
             last_token_logit = last_token_logit.masked_fill(mask, -float("inf"))
             # softmax and sample
             next_token = multinomial(
                 F.softmax(last_token_logit, dim=-1), num_samples=1
             ).item()
-            input_str = input_str + tokenizer.decode([next_token])
-            print(input_str)
+
+            if next_token == stop_token_id:
+                break
+
+            next_token_tensor = tensor([[next_token]]).to(device)
+            input_tensor = torch.cat((input_tensor, next_token_tensor), dim=1)
+
+        generated_text = tokenizer.decode(input_tensor.squeeze(0).tolist())
+        print(generated_text)
 
 
 def inference_with_temperature_and_topk(
@@ -213,6 +236,17 @@ def calculate_loss_for_single_batch():
         break
 
 
+def freeze_model_for_ift(model):
+    for param in model.parameters():
+        param.requires_grad = False
+    for param in model.transformers[-1].parameters():
+        param.requires_grad = True
+    for param in model.final_norm.parameters():
+        param.requires_grad = True
+    for param in model.out_head.parameters():
+        param.requires_grad = True
+
+
 def calculate_avg_loss_for_dataset(model, dataloader):
     cross_entropy_loss_fn = nn.CrossEntropyLoss()
     model.eval()
@@ -281,10 +315,83 @@ def train():
     trained_model_inference(model)
 
 
-def save_model(model, optim):
-    os.makedirs("./weights", exist_ok=True)
-    os.makedirs("./optim", exist_ok=True)
-    existing = glob.glob("./weights/*.pth")
+def instruction_fine_tune(
+    model, device="mps", batch_size=8, num_epochs=NUM_EPOCHS, lr=1e-4
+):
+    pad_token_id = 50256
+    ignore_index = -100
+    tokenizer = tiktoken.get_encoding("gpt2")
+    dataset = InstructionFineTuningDataset(tokenizer=tokenizer)
+    # dataset.inputs = dataset.inputs[:50]
+    # dataset.targets = dataset.targets[:50]
+    n_train = int(len(dataset) * 0.85)
+    n_val = len(dataset) - n_train
+    train_dataset, val_dataset = random_split(dataset, [n_train, n_val])
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=partial(
+            collate_fn,
+            pad_token_id=pad_token_id,
+            ignore_index=ignore_index,
+            device=device,
+        ),
+    )
+    validation_dataloader = DataLoader(
+        dataset=val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        collate_fn=partial(
+            collate_fn,
+            pad_token_id=pad_token_id,
+            ignore_index=ignore_index,
+            device=device,
+        ),
+    )
+    # freeze_model_for_ift(model)
+    model.to(device)
+    cross_entropy_loss_fn = nn.CrossEntropyLoss(ignore_index=ignore_index)
+    optim = AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()), lr=lr, weight_decay=0.1
+    )
+    validation_loss_per_epoch = [
+        calculate_avg_loss_for_dataset(model=model, dataloader=validation_dataloader)
+    ]
+    print(f"Epoch -1, val loss: {validation_loss_per_epoch[-1]}")
+    print("Starting instruction fine-tuning loop")
+    for epoch in range(num_epochs):
+        start = time.time()
+        model.train()
+        total_batches = len(train_dataloader)
+        for batch_idx, (input, target) in enumerate(train_dataloader):
+            optim.zero_grad()
+            prediction = model(input)
+            prediction = prediction.flatten(0, 1)
+            target = target.flatten()
+            loss = cross_entropy_loss_fn(prediction, target)
+            loss.backward()
+            optim.step()
+            if (batch_idx + 1) % 10 == 0:
+                print(f"  {batch_idx + 1} / {total_batches} batches")
+        validation_loss_per_epoch.append(
+            calculate_avg_loss_for_dataset(
+                model=model, dataloader=validation_dataloader
+            )
+        )
+        print(
+            f"Epoch {epoch}, val loss: {validation_loss_per_epoch[-1]}, time: {time.time() - start:.2f}s"
+        )
+    plot_loss(validation_loss_per_epoch, subfolder="/gpt2/ift")
+    save_model(model, optim, subfolder="/gpt2/ift")
+
+
+def save_model(model, optim, subfolder=""):
+    weights_dir = f"./weights{subfolder}"
+    optim_dir = f"./optim{subfolder}"
+    os.makedirs(weights_dir, exist_ok=True)
+    os.makedirs(optim_dir, exist_ok=True)
+    existing = glob.glob(f"{weights_dir}/*.pth")
     next_id = (
         max(
             (int(os.path.splitext(os.path.basename(f))[0]) for f in existing),
@@ -292,35 +399,38 @@ def save_model(model, optim):
         )
         + 1
     )
-    torch.save(model.state_dict(), f"./weights/{next_id:03d}.pth")
-    torch.save(optim.state_dict(), f"./optim/{next_id:03d}.pth")
+    torch.save(model.state_dict(), f"{weights_dir}/{next_id:03d}.pth")
+    torch.save(optim.state_dict(), f"{optim_dir}/{next_id:03d}.pth")
 
 
-def load_model(model, optim=None):
-    existing_weights = glob.glob("./weights/*.pth")
+def load_model(model, optim=None, subfolder=""):
+    weights_dir = f"./weights{subfolder}"
+    optim_dir = f"./optim{subfolder}"
+    existing_weights = glob.glob(f"{weights_dir}/*.pth")
     if not existing_weights:
-        raise FileNotFoundError("No weights found in ./weights/")
+        raise FileNotFoundError(f"No weights found in {weights_dir}/")
     latest_weights = max(
         existing_weights, key=lambda f: int(os.path.splitext(os.path.basename(f))[0])
     )
     model.load_state_dict(torch.load(latest_weights, weights_only=True))
     if optim is not None:
-        existing_optim = glob.glob("./optim/*.pth")
+        existing_optim = glob.glob(f"{optim_dir}/*.pth")
         if not existing_optim:
-            raise FileNotFoundError("No weights found in ./optim/")
+            raise FileNotFoundError(f"No weights found in {optim_dir}/")
         latest_optim = max(
             existing_optim, key=lambda f: int(os.path.splitext(os.path.basename(f))[0])
         )
         optim.load_state_dict(torch.load(latest_optim, weights_only=True))
 
 
-def plot_loss(losses):
+def plot_loss(losses, subfolder=""):
     plt.plot(losses)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Validation Loss")
-    os.makedirs("./plots", exist_ok=True)
-    existing = glob.glob("./plots/*.png")
+    plots_dir = f"./plots{subfolder}"
+    os.makedirs(plots_dir, exist_ok=True)
+    existing = glob.glob(f"{plots_dir}/*.png")
     next_id = (
         max(
             (int(os.path.splitext(os.path.basename(f))[0]) for f in existing),
@@ -328,8 +438,12 @@ def plot_loss(losses):
         )
         + 1
     )
-    plt.savefig(f"./plots/{next_id:03d}.png")
+    plt.savefig(f"{plots_dir}/{next_id:03d}.png")
     # plt.show()
+
+
+def format_inference_prompt(instruction, input_text=""):
+    return f"### Instruction: {instruction}; ### Input: {input_text}; ### Output: "
 
 
 if __name__ == "__main__":
@@ -343,9 +457,31 @@ if __name__ == "__main__":
     # train()
     # trained_model_inference()
     # inference_with_temperature_and_topk()
-    model = load_and_map_gpt2(CONFIG_GPT2_124M)
-    device = "mps"
-    model.to(device)
     # gpt2_inference(model)
     # gpt2_inference_with_temperature_and_topk(model=model)
-    calculate_gpt2_loss_for_single_batch(model=model, device=device)
+    # calculate_gpt2_loss_for_single_batch(model=model, device=device)
+
+    # Code block to do IFT
+    # device = "mps"
+    # model = load_and_map_gpt2(CONFIG_GPT2_124M)
+    # instruction_fine_tune(
+    #     model=model, lr=1e-5, batch_size=8, num_epochs=2, device=device
+    # )
+
+    # Code block to do post IFT inference
+    device = "mps"
+    model = load_and_map_gpt2(CONFIG_GPT2_124M)
+    # freeze_model_for_ift(model)
+    optim = AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5, weight_decay=0.1
+    )
+    load_model(model=model, optim=optim, subfolder="/gpt2/ift")
+    model.to(device)
+    gpt2_inference_with_temperature_and_topk(
+        model,
+        init_context=format_inference_prompt("List an antonym of complicated"),
+        max_tokens=20,
+        temperature=0.7,
+        top_k=3,
+        device=device,
+    )
