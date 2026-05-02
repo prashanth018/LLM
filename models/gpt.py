@@ -55,6 +55,37 @@ class GPT(Module):
         return logits
 
 
+class TransformerBase(Module):
+    def __init__(self, config):
+        super().__init__()
+        self.token_embedding = TokenEmbedding(
+            vocab_size=config["vocab_size"], vector_dim=config["dim"]
+        )
+        self.positional_embedding = PositionalEmbedding(
+            context_length=config["context_length"], vector_dim=config["dim"]
+        )
+        self.transformers = Sequential(
+            *[
+                Transformer(
+                    context_length=config["context_length"],
+                    dim=config["dim"],
+                    n_heads=config["n_heads"],
+                    dropout=config["dropout"],
+                )
+                for i in range(config["n_layers"])
+            ]
+        )
+        self.dropout = Dropout(config["dropout"])
+
+    def forward(self, x):
+        batch_size, context_length = x.shape
+        x_pos = self.positional_embedding[arange(context_length, device=x.device)]
+        x = self.token_embedding(x) + x_pos
+        x = self.dropout(x)
+        x = self.transformers(x)
+        return x
+
+
 if __name__ == "__main__":
     tokenizer = tiktoken.get_encoding("gpt2")
     dataset = GutenbergDataset(
