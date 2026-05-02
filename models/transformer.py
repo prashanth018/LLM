@@ -2,7 +2,7 @@ from torch.nn import Module, Parameter, Sequential, Linear, Dropout
 from torch import ones, zeros, tanh
 import math
 
-from attention import MultiHeadAttentionEfficient
+from models.attention import MultiHeadAttentionEfficient
 
 
 class GELU(Module):

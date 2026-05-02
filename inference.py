@@ -23,7 +23,7 @@ import time
 
 from utils.constants import CONFIG_EXP_M, CONFIG_GPT2_124M, NUM_EPOCHS
 from dataset.gutenberg_dataset import GutenbergDataset
-from gpt import GPT
+from models.gpt import GPT
 
 
 def inference(init_context="I love", max_tokens=10):

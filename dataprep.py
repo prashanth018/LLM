@@ -3,8 +3,8 @@ from torch.utils.data import DataLoader
 
 
 from dataset.gutenberg_dataset import GutenbergDataset
-from nnets import PositionalEmbedding, TokenEmbedding
-from attention import MultiHeadAttention, MultiHeadAttentionEfficient
+from models.embeddings import PositionalEmbedding, TokenEmbedding
+from models.attention import MultiHeadAttention, MultiHeadAttentionEfficient
 from torch import tensor
 from torch import arange
 

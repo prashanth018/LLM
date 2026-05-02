@@ -3,8 +3,8 @@ import tiktoken
 from torch.utils.data import DataLoader
 
 from dataset.gutenberg_dataset import GutenbergDataset
-from nnets import PositionalEmbedding, TokenEmbedding
-from transformer import LayerNorm, Transformer
+from models.embeddings import PositionalEmbedding, TokenEmbedding
+from models.transformer import LayerNorm, Transformer
 
 from torch import arange
 

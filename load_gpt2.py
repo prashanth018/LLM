@@ -1,4 +1,4 @@
-from gpt import GPT
+from models.gpt import GPT
 from utils.constants import CONFIG_GPT2_124M, GPT2_MODEL_DIRECTORY, GPT2_MODEL_SIZE
 from utils.gpt_download import download_gpt2, load_gpt2
 import torch
