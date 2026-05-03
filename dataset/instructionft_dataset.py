@@ -10,7 +10,7 @@ import torch
 
 class InstructionFineTuningDataset(Dataset):
 
-    def __init__(self, tokenizer, context_length=1028):
+    def __init__(self, tokenizer, context_length=1024):
         super().__init__()
         self.tokenizer = tokenizer
         self.context_length = context_length
@@ -50,7 +50,7 @@ class InstructionFineTuningDataset(Dataset):
         return len(self.inputs)
 
 
-def collate_fn(batch, pad_token_id=50256, ignore_index=-100, device="cpu"):
+def ift_collate_fn(batch, pad_token_id=50256, ignore_index=-100, device="cpu"):
     input_list = []
     target_list = []
     for i, t in batch:
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(
         dataset=dataset,
         collate_fn=partial(
-            collate_fn, pad_token_id=50256, ignore_index=-100, device="mps"
+            ift_collate_fn, pad_token_id=50256, ignore_index=-100, device="mps"
         ),
         batch_size=8,
         shuffle=True,

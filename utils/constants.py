@@ -13,6 +13,7 @@ DROPOUT = 0.1
 NUM_EPOCHS = 5
 GPT2_MODEL_SIZE = "124M"
 GPT2_MODEL_DIRECTORY = "model_weights"
+QWEN_INSTRUCT_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 
 CONFIG_EXP_S = {
     "context_length": CONTEXT_LENGTH_SMALL,

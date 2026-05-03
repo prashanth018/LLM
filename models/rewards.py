@@ -1,14 +1,21 @@
+import tiktoken
 from torch import arange
-from torch.nn import Linear
+from torch.nn import Linear, Module
+from transformers import AutoModelForCausalLM, AutoConfig
 
-from models.gpt import TransformerBase
+from utils.constants import QWEN_INSTRUCT_MODEL
 
 
-class BradleyTerry(TransformerBase):
-    def __init__(self, config, eos_token=50256):
+class BradleyTerryRewardModel(Module):
+    def __init__(self, base_lm, eos_token):
+        self.base_lm = base_lm
+        self.reward_head = Linear(
+            in_features=self.base_lm.config["hidden_size"], out_features=1, bias=True
+        )
+        # eos_token populated from tiktoken
         self.eos_token = eos_token
-        super().__init__(config)
-        self.reward_head = Linear(in_features=config["dim"], out_features=1, bias=True)
+        # pad_token_id is not populated by default
+        self.base_lm.config.pad_token_id = eos_token
 
     def forward(self, x):
         mask = x == self.eos_token
@@ -17,9 +24,19 @@ class BradleyTerry(TransformerBase):
         # eos pos is len(batch[i])th index
         eos_pos = batch_context_len - num_eos
         r_idx = arange(batch_size)
-        x = super().forward(x)
+        outputs = self.base_lm(x, output_hidden_states=True)
+        x = outputs.hidden_states[-1]
         # x[eos_pos] directly selects the rows. For example, if eos_pos = [2,5],
         # it selects 2nd and 5th row. We rather want 2nd and 5th column in the
         # respective rows to be selected, so we use row index.
         eos_context_vecs = x[r_idx, eos_pos, :]
         return self.reward_head(eos_context_vecs).squeeze(-1)
+
+
+if __name__ == "__main__":
+    base_lm = AutoModelForCausalLM.from_pretrained(QWEN_INSTRUCT_MODEL)
+    # config = AutoConfig.from_pretrained(QWEN_INSTRUCT_MODEL)
+    tokenizer = tiktoken.get_encoding(QWEN_INSTRUCT_MODEL)
+    tokenizer.pad_token = tokenizer.eos_token
+    BradleyTerryRewardModel(base_lm, tokenizer.eos_token)
+    # print(config)

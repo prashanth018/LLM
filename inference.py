@@ -1,7 +1,7 @@
 from functools import partial
 import os
 
-from dataset.instructionft_dataset import InstructionFineTuningDataset, collate_fn
+from dataset.instructionft_dataset import InstructionFineTuningDataset, ift_collate_fn
 from load_gpt2 import load_and_map_gpt2
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -178,7 +178,7 @@ def calculate_gpt2_loss_for_single_batch(
     dataloader = DataLoader(
         dataset=dataset,
         collate_fn=partial(
-            collate_fn,
+            ift_collate_fn,
             pad_token_id=pad_token_id,
             ignore_index=ignore_index,
             device=device,
@@ -332,7 +332,7 @@ def instruction_fine_tune(
         batch_size=batch_size,
         shuffle=True,
         collate_fn=partial(
-            collate_fn,
+            ift_collate_fn,
             pad_token_id=pad_token_id,
             ignore_index=ignore_index,
             device=device,
@@ -343,7 +343,7 @@ def instruction_fine_tune(
         batch_size=batch_size,
         shuffle=False,
         collate_fn=partial(
-            collate_fn,
+            ift_collate_fn,
             pad_token_id=pad_token_id,
             ignore_index=ignore_index,
             device=device,
