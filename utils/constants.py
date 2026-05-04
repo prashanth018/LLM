@@ -1,3 +1,11 @@
+import torch
+
+DEVICE = (
+    "cuda" if torch.cuda.is_available()
+    else "mps" if torch.backends.mps.is_available()
+    else "cpu"
+)
+
 BATCH_SIZE = 8
 VECTOR_DIM = 18
 NUM_HEADS = 6

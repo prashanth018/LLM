@@ -1,19 +1,17 @@
 from functools import partial
 
 from datasets import load_dataset
-from torch import tensor
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer
 
-from utils.constants import QWEN_INSTRUCT_MODEL
-
-TEMP = 400
+from utils.constants import DEVICE, QWEN_INSTRUCT_MODEL
 
 
 class PreferenceDataset(Dataset):
-    def __init__(self, dataset):
+    def __init__(self, dataset, pct=1):
         super().__init__()
-        self.dataset = dataset.select(range(TEMP))
+        n = int(len(dataset) * pct)
+        self.dataset = dataset.select(range(n))
         self.chosen, self.rejected = self.create_data()
 
     def create_data(self):
@@ -60,13 +58,13 @@ def preference_collate_fn(batch, tokenizer, context_length=512, device="mps"):
 if __name__ == "__main__":
     hh_rlhf = load_dataset("Anthropic/hh-rlhf")
     tokenizer = AutoTokenizer.from_pretrained(QWEN_INSTRUCT_MODEL)
-    train_dataset = PreferenceDataset(dataset=hh_rlhf["train"])
+    train_dataset = PreferenceDataset(dataset=hh_rlhf["train"], pct=0.05)
     dataloader = DataLoader(
         dataset=train_dataset,
         collate_fn=partial(
-            preference_collate_fn, tokenizer=tokenizer, context_length=512, device="mps"
+            preference_collate_fn, tokenizer=tokenizer, context_length=512, device=DEVICE
         ),
-        batch_size=8,
+        batch_size=1,
         shuffle=True,
     )
     val = next(iter(dataloader))
