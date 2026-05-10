@@ -117,13 +117,13 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(
         dataset=train_dataset,
         collate_fn=collate,
-        batch_size=16,
+        batch_size=8,
         shuffle=True,
     )
     test_dataloader = DataLoader(
         dataset=test_dataset,
         collate_fn=collate,
-        batch_size=16,
+        batch_size=8,
         shuffle=False,
     )
     base_lm = AutoModelForCausalLM.from_pretrained(

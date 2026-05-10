@@ -23,9 +23,10 @@ class BradleyTerryRewardModel(Module):
         num_eos = mask.sum(dim=-1)
         # eos pos is len(batch[i])th index
         eos_pos = batch_context_len - num_eos
-        outputs = self.base_lm(x, output_hidden_states=True)
-        # get the output of the last hidden layer (before reward head)
-        x = outputs.hidden_states[-1]
+        # call the inner transformer directly (skip the LM head + ~5GB logits tensor)
+        outputs = self.base_lm.model(x)
+        # last hidden state straight from the base model — no need to retain all layers
+        x = outputs.last_hidden_state
         # x[eos_pos] directly selects the rows. For example, if eos_pos = [2,5],
         # it selects 2nd and 5th row. We rather want 2nd and 5th column in the
         # respective rows to be selected, so we use row index.
