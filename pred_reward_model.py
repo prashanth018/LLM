@@ -117,7 +117,7 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(
         dataset=train_dataset,
         collate_fn=collate,
-        batch_size=8,
+        batch_size=4,
         shuffle=True,
     )
     test_dataloader = DataLoader(
@@ -131,6 +131,7 @@ if __name__ == "__main__":
     )
     model = BradleyTerryRewardModel(base_lm, tokenizer.eos_token_id)
     model.to(device=DEVICE)
+    model.base_lm.gradient_checkpointing_enable()
 
     train(
         model,
