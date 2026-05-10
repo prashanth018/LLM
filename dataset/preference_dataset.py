@@ -62,7 +62,10 @@ if __name__ == "__main__":
     dataloader = DataLoader(
         dataset=train_dataset,
         collate_fn=partial(
-            preference_collate_fn, tokenizer=tokenizer, context_length=512, device=DEVICE
+            preference_collate_fn,
+            tokenizer=tokenizer,
+            context_length=512,
+            device=DEVICE,
         ),
         batch_size=1,
         shuffle=True,

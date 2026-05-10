@@ -1,10 +1,28 @@
+import os
+from pathlib import Path
+
 import torch
 
 DEVICE = (
-    "cuda" if torch.cuda.is_available()
-    else "mps" if torch.backends.mps.is_available()
-    else "cpu"
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps" if torch.backends.mps.is_available() else "cpu"
 )
+
+IS_KAGGLE = "KAGGLE_KERNEL_RUN_TYPE" in os.environ or Path("/kaggle/working").exists()
+
+
+def resolve_save_path(filename):
+    """Return a save path that persists on whatever environment we're on.
+
+    On Kaggle, prepends /kaggle/working/ so the file survives session teardown
+    and shows up as notebook output. Locally, returns the filename as-is
+    (resolved against cwd).
+    """
+    if IS_KAGGLE:
+        return str(Path("/kaggle/working") / filename)
+    return filename
+
 
 BATCH_SIZE = 8
 VECTOR_DIM = 18

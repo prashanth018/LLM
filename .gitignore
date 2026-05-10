@@ -6,3 +6,4 @@ plots/
 model_weights/
 optim/
 .vscode/launch.json
+.vscode/settings.json
