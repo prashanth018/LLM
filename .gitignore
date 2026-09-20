@@ -7,3 +7,5 @@ model_weights/
 optim/
 .vscode/launch.json
 .vscode/settings.json
+pennystocks.json
+pennystocks_scanner.py

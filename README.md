@@ -32,6 +32,10 @@ Build a large language model from scratch, including pretraining, instruction fi
 - Target tokens in SFT use `-100` as the ignore index for `CrossEntropyLoss` (pads beyond the first `<eos>` are masked out).
 - `-100` is never used in input tokens.
 
+## Misconceptions
+Things I got wrong while building this, with the corrections.
+- [Q/K/V projection vs. the split into heads](notes/attention.md) — which comes first, and why.
+
 ## Dataset
 - For preference reward model training, using https://huggingface.co/datasets/Anthropic/hh-rlhf
 
