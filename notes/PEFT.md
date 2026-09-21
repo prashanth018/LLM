@@ -4,13 +4,42 @@ This explores: *LoRA, LoRA-FA, VeRA, Delta-LoRA, LoRA+* techniques
 
 ## Low-Rank Adaptation (LoRA)
 
-**Intuition:** `Wx + BAx`, where `B` is `768 x 16` and `A` is `16 x 768`.
+**Intuition:** `Wx + (alpha / r) * BAx`, where `B` is `768 x 16` and `A` is `16 x 768`.
+
+`BAx` reads right to left, so `x` meets `A` first: `A` compresses 768 down to 16, and `B` expands 16 back up to 768.
 
 For fine-tuning, we don't have to train the weights of the huge `W` matrix. We aren't relearning the structure of the language — we're only learning the *preferences* and *alignment* for the task at hand. For that, a rank of 16 should be enough.
 
 So we project the input down into a lower rank (16 here) and then project it back up to the original dim. The goal was never to relearn `W`; instead we let the `delta` percolate into the learnable `A` and `B`. Everything else stays frozen — `W` never receives a gradient.
 
 Applied to the `Q` and `V` matrices by convention, but in general it can go on any learnable matrix.
+
+## LoRA-FA (Frozen `A`)
+
+Standard LoRA trains both matrices — the compression `A` and the expansion `B`. LoRA-FA initializes `A` with random weights and freezes it immediately. The input gets compressed through that static, random projection, and only `B` receives gradients, learning to unpack it into the new task distribution.
+
+So the compression isn't learned — only what to do with the compressed vector is.
+
+**Note regarding trainable parameters:** `A` is `16 x 768` and `B` is `768 x 16`, the same size, so freezing `A` halves the trainable count. That only holds for a square matrix. On `c_attn` (`768 -> 2304`), `A` is still `16 x 768` = 12,288 params but `B` is `2304 x 16` = 36,864, so freezing `A` drops 12,288 out of 49,152 — a quarter, not a half.
+
+**Activation memory.** To compute the gradient of a weight matrix, you need the input that was fed into it on the forward pass, so that input has to stay in memory until backward runs.
+
+- `A`'s input is `x` — 768 floats per token.
+- `B`'s input is `Ax` — 16 floats per token.
+
+Training both means holding onto the 768-dim `x`. With `A` frozen there's no `A` gradient to compute, so only the 16-dim `Ax` needs to be kept.
+
+## VeRA (Vector-based Random Matrix Adaptation)
+
+Pushes the parameter reduction to the extreme. Both `A` and `B` are initialized randomly and completely frozen — neither is trained. What gets trained instead is two scaling vectors, `b` and `d`:
+
+`delta_W = S_b · B · S_d · A`, where `S_b` and `S_d` are diagonal matrices built from `b` and `d`.
+
+Reading right to left: `A` compresses 768 → 16, `S_d` rescales the 16 dims, `B` expands 16 → 768, `S_b` rescales the 768 outputs. So the projections are fixed and only their per-dimension gains are learned.
+
+`b` has length 768 and `d` has length 16, so that's 784 trainable params per adapted matrix against LoRA's 24,576.
+
+The other half of the saving: `A` and `B` are **shared across all layers** — generated once from a fixed seed and reused everywhere. Only `b` and `d` are per-layer.
 
 ---
 
@@ -65,3 +94,4 @@ Full note: [`distillation.md`](distillation.md).
 ## Glossary to revisit
 
 - Intuition behind the rank of a matrix.
+- Intuition behind the `alpha / r` scaling in LoRA.
