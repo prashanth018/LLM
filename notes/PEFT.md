@@ -41,7 +41,27 @@ Reading right to left: `A` compresses 768 → 16, `S_d` rescales the 16 dims, `B
 
 The other half of the saving: `A` and `B` are **shared across all layers** — generated once from a fixed seed and reused everywhere. Only `b` and `d` are per-layer.
 
----
+## Delta-LoRA
+***best of them all. Personal favourite!*
+
+Standard LoRA leaves `W` frozen forever, so the total adaptation is permanently capped at rank `r`. Delta-LoRA updates `W` as well, without ever giving it a gradient or an optimizer state.
+
+`W_{t+1} = W_t + c * (B_{t+1} A_{t+1} - B_t A_t)`
+
+Per step: backprop as usual with only `A` and `B` in the optimizer. Once the optimizer has stepped them, take the difference between the new `BA` product and the old one, scale it by `c`, and add it to `W` in place. That addition is a detached tensor op — autograd never sees it, so the moment buffers are never allocated for `W`.
+
+**Why the delta of `BA` is a valid direction for `W`.** Since `h = Wx + BAx`, the two paths sit in parallel on the same input, so `dL/dW` and `dL/d(BA)` are the same up to a constant. The change in `BA` already *is* the update `W` would have received.
+
+**Where the extra capacity comes from.** Each step adds a rank-`r` change, but rank is subadditive. This means, **theoritically**, two different rank-16 updates sum to something up to rank 32. Thousands of accumulated rank-16 shifts drift `W` through a high-rank subspace, so the total adaptation escapes the rank ceiling even though every individual step respects it.
+
+**Memory footprint is identical to standard LoRA.** Delta-LoRA still saves the first and second moments in the optimizer like the LoRA so from parameteric perspective both are economically similar. The main win is being able to represent more than what the rank can theoretically represent over the given training epochs. This means, you can do SFT longer and on complex tasks and see meaningful gains.
+
+**What it costs.** `W` is permanently modified, so the base model is no longer shared. LoRA's practical selling point is: "one frozen base plus many swappable few-MB adapters". This will no longer be the case and each run produces a full fine-tuned model.
+
+Two implementation details from the paper: dropout is removed from the adapter (the `dL/dW = dL/d(BA)` equivalence needs both paths to see the same input), and the `W` updates only start after a warmup of `K` steps.
+
+## LoRA+
+Same as standard LoRA but uses a faster learning rate for B (usually 2x to 16x higher than A). Apparently I using the same learning rate is inefficient and the above set up leads to faster convergence. I couldn't get to the underlying intuition.
 
 ## Follow-on questions
 
@@ -95,3 +115,5 @@ Full note: [`distillation.md`](distillation.md).
 
 - Intuition behind the rank of a matrix.
 - Intuition behind the `alpha / r` scaling in LoRA.
+- Why Delta-LoRA has to remove dropout from the adapter — what dropout does to the `dL/dW = dL/d(BA)` equivalence.
+- Intuition behind different learning rates in LoRA+  
