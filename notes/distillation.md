@@ -65,4 +65,8 @@ for x, y in loader:
 
 ## Open questions
 
--
+- **The KL direction — is distillation forward or backward KL, and why does that choice matter?**
+  - First pin the direction from the code: `F.kl_div(input=log_softmax(student), target=softmax(teacher))` computes `KL(target || input) = KL(teacher || student)`. So the *teacher* is the reference `p`, the *student* is the model `q` → this is **forward KL**, `KL(p || q)`. (Double-check PyTorch's arg convention yourself — it's a classic footgun.)
+  - Now the intuition to build: forward KL is **mass-covering / mean-seeking** (zero-*avoiding*) — `q` is punished hard for putting ~0 probability where `p` has mass. Work out *why* that's exactly what distillation wants: we're trying to transfer the whole "dark knowledge" spread (London/Rome/Berlin), so the student must **cover** the teacher's full distribution, not collapse onto Paris. What would go wrong if you used backward KL here?
+  - **Deep-dive cross-link (this is the unlock for the Nathan Lambert KL section you're stuck on):** RLHF uses the *opposite* direction — **backward KL** `KL(q || p)`, which is **mode-seeking** (zero-*forcing*). Reconcile it: why does distillation want mass-covering but RLHF-as-regularizer want mode-seeking? Same math, opposite goals. Get this and both click at once.
+  - Threads to pull for the geometry: forward vs backward KL asymmetry, why KL isn't a distance, and what each direction does to a multi-modal `p` (spread across all modes vs. lock onto one).

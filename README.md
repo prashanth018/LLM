@@ -40,6 +40,12 @@ Things I got wrong while building this, with the corrections.
 - For preference reward model training, using https://huggingface.co/datasets/Anthropic/hh-rlhf
 
 
+## TODO
+- [ ] Time per-token latency across a 100-token generation and watch it climb — every step re-attends over the full prefix from scratch. That curve is the motivation for a KV cache.
+- [ ] Add a KV cache.
+- [ ] Answer the open KL questions in [`notes/distillation.md`](notes/distillation.md) — forward vs backward KL, and why distillation and RLHF pick opposite directions.
+- [ ] Implement [nanochat](https://github.com/karpathy/nanochat) from scratch. Should teach a BPE tokenizer, a modern transformer (RoPE, Muon), pretrain → midtrain → SFT → GRPO with tool use, an eval harness, and a KV-cached inference engine — but not LoRA, not reward models, and nothing past a basic KV cache on the serving side.
+
 ## Requirements
 - Python 3.x
 - Conda (Miniforge recommended for Apple Silicon)
