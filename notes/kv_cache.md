@@ -113,6 +113,20 @@ total KV memory servable (- model weights themselves) = batch size × context le
 
 A top-end GPU roughly has 80–190 GB, and the weights take a big chunk of that. So with a vanilla KV cache, we might practically fit a few dozen requests, not 1000! For a given GPU, we'd have to reduce our per-request KV cache memory footprint to process more batches of requests. Currently, every decode step has to stream every request's whole cache through memory, therefore decode with a vanilla KV cache is memory-bandwidth-bound.
 
+Important concepts & distinction - Prefill vs decode:
+
+Prefill: As the name suggests is the process of passing the whole input sequence (say a prompt of 1000 words) once and this then
+- generates q,k,vs for all the tokens at once. Then we compute the attention scores, produce enriched context each layer and loop through multiple layers. This seems to be both heavy compute and bandwidth. But since we compute hard while also waiting on the memory transfers it is an efficient use of GPU.
+- Best is it sets up memory for doing a decode on the next token.
+- So prefill = fill the cache + emit the first token. 
+- We use the metric TTFT - time to first token
+- TTFT for a request with a prompt of length 100k takes 100x more time than a request with length 10k. This is because attention scales quadratic of the length of sequence. 
+
+Decode: It's the process of generating the next token given the current input sequence. Technically, this involves the cache to be already there to compute the attn weights and then context vector and then passing it through all the layers but *only* for the last token. Model weights are shared across batch of requests but kv cache is not shared across the request. This is memory bound and leaves scope for all the below cache innovations to reduce pre request footprint.
+
+Mental model for how to assess GPU efficiency:
+- Compute per byte transferred. Prefill makes a lot of computations for the given transferred data while decode makes less computations for given transferred data.
+
 ### Reducing the footprint
 
 - **MLA (DeepSeek)** — store a small compressed latent instead of full K and V, which cuts the cache many times over.
@@ -124,3 +138,8 @@ A top-end GPU roughly has 80–190 GB, and the weights take a big chunk of that.
 
 - **Memory-bandwidth-bound vs compute-bound.** Deep dive on <https://horace.io/brrr_intro.html> to understand compute-bound vs HBM-bound and how to improve GPU utilization.
 - **Continuous batching.** Deep dive on <https://huggingface.co/blog/continuous_batching>. Current understanding is handwavy — there is more to it.
+- GQA: Grouped Query Attention
+- Sparse attention?
+- Jev vs GPT
+- RLCD?
+- Encoder vs decoder intuition
