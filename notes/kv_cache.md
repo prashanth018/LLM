@@ -99,6 +99,26 @@ Per decode step, for each request:
 
 The catch: each request is at a different point in its own sequence generation, so the cache lengths differ. `req0` holds `K = (context_length_0, 768)` and `V = (context_length_0, 768)`, `req1` holds something else. Stack them and you get a **ragged** batch rather than a rectangle. Apparently this problem is resolved by PagedAttention and continuous batching (deep-dived in the follow on section).
 
+## Prefill vs decode
+
+**Prefill** is the process of passing the whole input sequence (say a prompt of 1000 tokens) through the model once. This:
+- generates q, k, vs for all the tokens at once. Then we compute the attention scores, produce the enriched context each layer, and loop through multiple layers.
+- sets up the cache for doing a decode on the next token.
+
+So **prefill = fill the cache + emit the first token.**
+
+Prefill looks heavy on both compute and bandwidth, but the bandwidth cost is a one-time load: each weight matrix gets pulled out of HBM once and is then applied to all 1000 tokens. Bytes moved stay roughly fixed while compute scales with the prompt length, so that load is amortized across the whole prompt. That's what makes prefill an efficient use of the GPU.
+
+The metric here is **TTFT — time to first token**. Attention scales quadratically with sequence length, so the attention work for a 100k-token prompt is 100x what it is for a 10k one.
+
+**Decode** is the process of generating the next token given the current input sequence. Technically, this involves the cache to be already there to compute the attn weights and then the context vector and then passing it through all the layers but *only* for the last token. Model weights are shared across a batch of requests but the KV cache is not. This is memory bound and leaves scope for all the cache innovations below to reduce the per-request footprint.
+
+### Mental model for how to assess GPU efficiency
+
+**Compute per byte transferred.** Prefill makes a lot of computations for the given transferred data while decode makes less computations for given transferred data.
+
+*This is called arithmetic intensity — deep dive queued (Horace He's article) in Open threads.*
+
 ## Where it breaks: memory
 
 ### Per-request cost for GPT-3
@@ -113,22 +133,9 @@ total KV memory servable (- model weights themselves) = batch size × context le
 
 A top-end GPU roughly has 80–190 GB, and the weights take a big chunk of that. So with a vanilla KV cache, we might practically fit a few dozen requests, not 1000! For a given GPU, we'd have to reduce our per-request KV cache memory footprint to process more batches of requests. Currently, every decode step has to stream every request's whole cache through memory, therefore decode with a vanilla KV cache is memory-bandwidth-bound.
 
-Important concepts & distinction - Prefill vs decode:
-
-Prefill: As the name suggests is the process of passing the whole input sequence (say a prompt of 1000 words) once and this then
-- generates q,k,vs for all the tokens at once. Then we compute the attention scores, produce enriched context each layer and loop through multiple layers. This seems to be both heavy compute and bandwidth. But since we compute hard while also waiting on the memory transfers it is an efficient use of GPU.
-- Best is it sets up memory for doing a decode on the next token.
-- So prefill = fill the cache + emit the first token. 
-- We use the metric TTFT - time to first token
-- TTFT for a request with a prompt of length 100k takes 100x more time than a request with length 10k. This is because attention scales quadratic of the length of sequence. 
-
-Decode: It's the process of generating the next token given the current input sequence. Technically, this involves the cache to be already there to compute the attn weights and then context vector and then passing it through all the layers but *only* for the last token. Model weights are shared across batch of requests but kv cache is not shared across the request. This is memory bound and leaves scope for all the below cache innovations to reduce pre request footprint.
-
-Mental model for how to assess GPU efficiency:
-- Compute per byte transferred. Prefill makes a lot of computations for the given transferred data while decode makes less computations for given transferred data.
-
 ### Reducing the footprint
 
+- **GQA (Grouped Query Attention)** — several query heads share one K/V head, cutting the cache by the group factor. The most widely deployed of these (Llama, Mistral).
 - **MLA (DeepSeek)** — store a small compressed latent instead of full K and V, which cuts the cache many times over.
 - **Local / sliding-window layers** — keep only the last N tokens' K and V in some layers.
 - **Cross-layer sharing** — layers reuse each other's K and V.
