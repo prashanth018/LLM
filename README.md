@@ -1,6 +1,16 @@
 # LLM from Scratch
 Build a large language model from scratch, including pretraining, instruction fine-tuning, and RLHF reward modeling.
 
+## Deep dives
+Write-ups from building this, in [`notes/`](notes/).
+
+| Topic | What it covers |
+|---|---|
+| [KV Cache](notes/kv_cache.md) | Worked example of KV Cache in use and proof, prefill vs decode, GPU efficiency, the memory bottleneck (GPT-3 per-request cost) and ways to shrink it. |
+| [Attention: misconceptions](notes/attention.md) | Q/K/V projection happens *before* the split into heads (the modeling reason and the hardware reason), why the output projection mixes heads, and which triangle the causal mask zeroes out. |
+| [PEFT](notes/PEFT.md) | LoRA, LoRA-FA, VeRA, Delta-LoRA, LoRA+, plus follow-ups: why not factor every matrix, what the FFN actually does, how LoRA relates to distillation. |
+| [Knowledge Distillation](notes/distillation.md) | Soft labels, temperature, other open questions about forward vs backward KL. |
+
 ## Files
 - `tokenizer.py` — Simple tokenizer implementation
 - `models/gpt.py` — GPT model, TransformerBase (shared base for LM and reward models)
@@ -31,10 +41,6 @@ Build a large language model from scratch, including pretraining, instruction fi
 - Input tokens are padded with `50256` (`<|endoftext|>`).
 - Target tokens in SFT use `-100` as the ignore index for `CrossEntropyLoss` (pads beyond the first `<eos>` are masked out).
 - `-100` is never used in input tokens.
-
-## Misconceptions
-Things I got wrong while building this, with the corrections.
-- [Q/K/V projection vs. the split into heads](notes/attention.md) — which comes first, and why.
 
 ## Dataset
 - For preference reward model training, using https://huggingface.co/datasets/Anthropic/hh-rlhf
