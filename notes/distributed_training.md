@@ -1,4 +1,4 @@
-
+Source: [Nanotron Ultra Scale](https://huggingface.co/spaces/nanotron/ultrascale-playbook?section=profiling_gpu_compute_and_communication)
 
 - It's easier to talk about an LLM input as a volume of tokens per batch i.e., b * seq. Usual size is 4-60 million tokens per batch.
 - DeepSeek was trained with a batch size of ~60M tokens for 14 trillion tokens.
